@@ -1,0 +1,44 @@
+# Virtual Environment
+venv/
+.env/
+env/
+
+# Python bytecode files
+_pycache_/
+*.pyc
+*.pyo
+*.pyd
+
+# IDEs and editors
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Log files
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Dependency files (if not required for sharing)
+poetry.lock
+Pipfile.lock
+
+# Database files
+*.db
+*.sqlite3
+
+# Test and coverage
+.coverage
+.tox/
+.nox/
+.hypothesis/
+.pytest_cache/
+
+# Sensitive files (environment variables, etc.)
+.env
+
+# Docker (optional)
+docker-compose.override.yml
