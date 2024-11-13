@@ -19,14 +19,19 @@ async def register(user: UserRegisterRequest, background_tasks: BackgroundTasks,
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
-    db_user = db.query(User).filter((User.email == user.email) | (User.phone_number == user.phone_number)).first()
+    # Cek apakah email atau nomor telepon sudah terdaftar
+    db_user = db.query(User).filter(
+        (User.email == user.email) | (User.phone_number == user.phone_number)
+    ).first()
     if db_user:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email atau nomor telepon sudah terdaftar")
 
+    # Hash password dan buat OTP
     hashed_password = get_password_hash(user.password)
     otp_code = ''.join(random.choices(string.digits, k=6))
     expires_at = datetime.utcnow() + timedelta(minutes=5)
 
+    # Simpan atau perbarui OTP di database
     otp_entry = db.query(OTP).filter(OTP.phone_number == user.phone_number).first()
     if otp_entry:
         otp_entry.otp_code = otp_code
@@ -36,10 +41,15 @@ async def register(user: UserRegisterRequest, background_tasks: BackgroundTasks,
         otp_entry = OTP(phone_number=user.phone_number, otp_code=otp_code, email=user.email, expires_at=expires_at)
         db.add(otp_entry)
 
-    new_user = User(email=user.email, phone_number=user.phone_number, password=hashed_password, user_name=user.user_name)
+    # Simpan pengguna baru
+    new_user = User(
+        email=user.email, phone_number=user.phone_number,
+        password=hashed_password, user_name=user.user_name
+    )
     db.add(new_user)
     db.commit()
 
+    # Kirim OTP via WhatsApp
     background_tasks.add_task(send_otp_via_whatsapp, user.phone_number, otp_code)
 
     return {"message": "OTP telah dikirim ke WhatsApp Anda. Silakan verifikasi untuk menyelesaikan pendaftaran."}
@@ -55,6 +65,7 @@ async def verify_otp(request: OTPVerificationRequest, db: Session = Depends(get_
     if not otp_entry or otp_entry.otp_code != request.otp or otp_entry.expires_at < datetime.utcnow():
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="OTP tidak valid atau telah kedaluwarsa")
 
+    # Hapus OTP yang sudah diverifikasi
     db.delete(otp_entry)
     db.commit()
 
@@ -68,12 +79,13 @@ async def resend_otp(request: ResendOtpRequest, background_tasks: BackgroundTask
     if not otp_entry:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Nomor telepon tidak ditemukan. Silakan daftar terlebih dahulu.")
     
+    # Generate OTP baru dan perbarui expiry time
     otp_code = ''.join(random.choices(string.digits, k=6))
     otp_entry.otp_code = otp_code
-    otp_entry.expires_at = datetime.utcnow() + timedelta(minutes=5)
-
+    otp_entry.expires_at = datetime.utcnow() + timedelta(minutes=1)
     db.commit()
 
+    # Kirim OTP via WhatsApp
     background_tasks.add_task(send_otp_via_whatsapp, formatted_phone_number, otp_code)
 
     return {"message": "OTP telah dikirim ulang ke WhatsApp Anda"}
